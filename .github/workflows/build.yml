@@ -1,37 +1,29 @@
 name: Build Android APK
+
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Repository Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up System Dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libssl-dev cmake
-
-      - name: Cache Buildozer Global Data
-        uses: actions/cache@v4
-        with:
-          path: ~/.buildozer
-          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
-
-      - name: Build APK with Buildozer Action
+      - name: Build Android APK
         uses: digreatbrian/buildozer-action@v2
         with:
-          # QUOTES ARE CRITICAL HERE:
-          python-version: '3.10'
+          python-version: "3.10"
           buildozer-cmd: buildozer -v android debug
 
-      - name: Upload Finished APK Package Artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LuaStudioIDE-AndroidAPK
-          path: ./*.apk
+          name: app-debug-apk
+          path: bin/*.apk
           if-no-files-found: error
