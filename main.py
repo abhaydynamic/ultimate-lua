@@ -1,10 +1,13 @@
+__version__ = "1.0"
+
 import os
 import sys
 import json
 import shutil
+import re
+import math
 import subprocess
 from io import StringIO
-from lupa import LuaRuntime
 
 from kivy.config import Config
 # Emulate mobile screen ratios for accurate desktop testing
@@ -58,6 +61,93 @@ OFFLINE_DOCS = {
     "string": "string library -> Provides standard string manipulation functions.",
     "table": "table library -> Provides generic functions for table manipulation."
 }
+
+
+class PurePythonLuaEngine:
+    """
+    A lightweight, Pure-Python Lua parser and transpiler.
+    Bypasses the need for C-extensions (like Lupa) which fail NDK compilation in Buildozer.
+    """
+    def execute(self, lua_code):
+        py_code = self.transpile(lua_code)
+        env = {"math": math, "print": print}
+        try:
+            exec(py_code, env)
+            return None
+        except Exception as e:
+            raise RuntimeError(f"Engine Parse Error: {e}")
+
+    def transpile(self, lua_code):
+        lines = lua_code.split('\n')
+        py_lines = []
+        indent = 0
+        for line in lines:
+            stripped = line.strip()
+            
+            if not stripped or stripped.startswith('--'):
+                continue
+                
+            if stripped == 'end':
+                indent = max(0, indent - 1)
+                continue
+                
+            if stripped.startswith('else'):
+                py_lines.append('    ' * max(0, indent - 1) + 'else:')
+                continue
+            if stripped.startswith('elseif '):
+                cond = stripped[7:-4].strip()
+                py_lines.append('    ' * max(0, indent - 1) + f'elif {cond}:')
+                continue
+
+            prefix = '    ' * indent
+            
+            if stripped.startswith('local '):
+                stripped = stripped[6:]
+                
+            # Handle Lua string concatenation '..' translating to Python '+'
+            if ' .. ' in stripped:
+                parts = stripped.split(' .. ')
+                # Wrap RHS in str() to prevent Python type errors during concat
+                stripped = parts[0] + ' + str(' + parts[1].replace(')', '))', 1)
+
+            if stripped.startswith('for '):
+                match = re.match(r'for\s+(\w+)\s*=\s*(.+?)\s*,\s*(.+?)\s*(?:,\s*(.+?)\s*)?do', stripped)
+                if match:
+                    var, start, end, step = match.groups()
+                    step_str = f", {step}" if step else ""
+                    stripped = f'for {var} in range({start}, {end} + 1{step_str}):'
+                    py_lines.append(prefix + stripped)
+                    indent += 1
+                    continue
+                    
+            if stripped.startswith('while '):
+                match = re.match(r'while\s+(.+?)\s+do', stripped)
+                if match:
+                    stripped = f'while {match.group(1)}:'
+                    py_lines.append(prefix + stripped)
+                    indent += 1
+                    continue
+                    
+            if stripped.startswith('if '):
+                match = re.match(r'if\s+(.+?)\s+then', stripped)
+                if match:
+                    stripped = f'if {match.group(1)}:'
+                    py_lines.append(prefix + stripped)
+                    indent += 1
+                    continue
+                    
+            if stripped.startswith('function '):
+                match = re.match(r'function\s+(.+?)\((.*?)\)', stripped)
+                if match:
+                    stripped = f'def {match.group(1)}({match.group(2)}):'
+                    py_lines.append(prefix + stripped)
+                    indent += 1
+                    continue
+
+            py_lines.append(prefix + stripped)
+            
+        return '\n'.join(py_lines)
+
 
 class AutoIndentCodeInput(CodeInput):
     """Custom CodeInput supporting basic auto-indentation and Kivy's native undo/redo."""
@@ -369,8 +459,7 @@ class ConsoleScreen(MDScreen):
         super().__init__(**kwargs)
         self.name = 'console'
         self.repl_mode = "LUA"
-        self.lua_runtime = LuaRuntime(unpack_returned_tuples=True)
-        self.lua_runtime.execute("print = python.builtins.print")
+        self.lua_engine = PurePythonLuaEngine()
         
         layout = MDBoxLayout(orientation='vertical')
         
@@ -486,12 +575,10 @@ class ConsoleScreen(MDScreen):
             redirected_output = StringIO()
             sys.stdout = redirected_output
             try:
-                res = self.lua_runtime.execute(cmd)
+                self.lua_engine.execute(cmd)
                 out = redirected_output.getvalue()
                 if out:
                     self.terminal_output.text += out
-                elif res is not None:
-                    self.terminal_output.text += str(res) + "\n"
             except Exception as e:
                 self.terminal_output.text += f"Error: {str(e)}\n"
             finally:
@@ -574,12 +661,10 @@ class LuaStudioIDEApp(MDApp):
         is_dark = self.ide_settings.get("dark_mode", False)
         self.theme_cls.theme_style = "Dark" if is_dark else "Light"
         
-        # Apply themes locally to override hardcoded elements
         self.editor_screen.update_theme(is_dark)
         self.console_screen.update_theme(is_dark)
         self.settings_screen.update_theme(is_dark)
         
-        # Update Nav Drawer
         bg = (0.12, 0.12, 0.12, 1) if is_dark else (0.95, 0.95, 0.95, 1)
         text = (1, 1, 1, 1) if is_dark else (0.1, 0.1, 0.1, 1)
         self.nav_drawer.md_bg_color = bg
@@ -752,8 +837,7 @@ class LuaStudioIDEApp(MDApp):
         console.text += f"\n>>> Running: {os.path.basename(self.current_open_file)}\n"
         
         try:
-            lua_engine = LuaRuntime(unpack_returned_tuples=True)
-            lua_engine.execute("print = python.builtins.print")
+            lua_engine = PurePythonLuaEngine()
             with open(self.current_open_file, "r", encoding="utf-8") as f:
                 script_content = f.read()
             lua_engine.execute(script_content)
@@ -800,6 +884,7 @@ class LuaStudioIDEApp(MDApp):
                 self.load_active_buffer_from_disk(self.current_open_file)
         else:
             self.load_active_buffer_from_disk(self.current_open_file)
+
 
 if __name__ == '__main__':
     LuaStudioIDEApp().run()
