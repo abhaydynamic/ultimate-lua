@@ -2,7 +2,7 @@ name: Build Android APK
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch: # Allows manual trigger click anytime
+  workflow_dispatch:
 
 jobs:
   build:
@@ -25,7 +25,8 @@ jobs:
       - name: Build APK with Buildozer Action
         uses: digreatbrian/buildozer-action@v2
         with:
-          python-version: 3.10
+          # QUOTES ARE CRITICAL HERE:
+          python-version: '3.10'
           buildozer-cmd: buildozer -v android debug
 
       - name: Upload Finished APK Package Artifact
