@@ -8,7 +8,7 @@ source.include_exts = py,png,jpg,jpeg,kv,atlas,json,txt,md,lua
 version = 1.0
 
 # Crucial dependencies mapping
-requirements = python3,kivy==2.3.0,kivymd==1.2.0,pygments,lupa
+requirements = python3,kivy,https://github.com/kivymd/archive/master.zip,pygments,lupa,materialyoucolor,exceptiongroup,asyncgui,asynckivy,pillow
 
 orientation = portrait
 fullscreen = 0
