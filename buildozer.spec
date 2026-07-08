@@ -20,7 +20,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy,https://github.com/kivymd/archive/master.zip,pygments,lupa,materialyoucolor,exceptiongroup,asyncgui,asynckivy,pillow
+requirements = python3,kivy,kivymd,pygments,lupa,materialyoucolor,exceptiongroup,asyncgui,asynckivy,pillow
 
 # (str) Icon of the application
 icon.filename = %(source.dir)s/icon.png
