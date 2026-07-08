@@ -1,5 +1,3 @@
-__version__ = "1.0"
-
 import os
 import sys
 import json
@@ -14,6 +12,7 @@ from kivy.config import Config
 Config.set('graphics', 'width', '400')
 Config.set('graphics', 'height', '750')
 
+from kivy.utils import platform
 from kivy.core.window import Window
 from kivy.uix.codeinput import CodeInput
 from kivy.uix.textinput import TextInput
@@ -37,7 +36,13 @@ from kivymd.uix.slider import MDSlider
 from kivymd.uix.label import MDLabel
 
 # --- POLICY-COMPLIANT LOCAL ENVIRONMENT PATHS ---
-WORKSPACE_DIR = os.path.join(os.path.expanduser("~"), "LuaProjectsWorkspace")
+if platform == 'android':
+    # On Android, use the app's guaranteed writable private directory
+    BASE_DIR = os.path.abspath(".")
+else:
+    BASE_DIR = os.path.expanduser("~")
+
+WORKSPACE_DIR = os.path.join(BASE_DIR, "LuaProjectsWorkspace")
 STATE_FILE = os.path.join(WORKSPACE_DIR, ".ide_session_state.json")
 SETTINGS_FILE = os.path.join(WORKSPACE_DIR, ".ide_settings.json")
 
@@ -781,7 +786,11 @@ class LuaStudioIDEApp(MDApp):
         self.file_opt_dialog.dismiss()
         src = os.path.join(WORKSPACE_DIR, filename)
         
-        downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+        if platform == 'android':
+            downloads_dir = "/storage/emulated/0/Download"
+        else:
+            downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+            
         if not os.path.exists(downloads_dir):
             try:
                 os.makedirs(downloads_dir)
